@@ -5,7 +5,7 @@ import datetime
 import matplotlib.pyplot as plt  # Отрисовка графиков
 import numpy as np  # Numpy
 from keras.models import Sequential  # Два варианты моделей
-from keras.layers import Dense, LSTM, Dropout  # Стандартные слои
+from keras.layers import Dense, LSTM, Dropout, Bidirectional  # Стандартные слои
 from sklearn.preprocessing import StandardScaler, MinMaxScaler  # Нормировщики
 from sklearn.metrics import mean_squared_error
 from math import sqrt
@@ -146,8 +146,6 @@ test_data = data[cutoff_point + 1:, ]
 scaler = StandardScaler()
 train_data = scaler.fit_transform(train_data)
 test_data = scaler.transform(test_data)
-print(len(train_data))
-print(len(test_data))
 
 
 # Метод окна
@@ -232,7 +230,7 @@ def split_sequence(sequence, n_steps_in, n_steps_out):
     return np.array(X), np.array(y)
 
 
-# Data preprocessing
+# Data preprocessing для 2 модели. Если меняем количество предсказаний, модель превращается в One2Seq
 
 d = pd.read_csv(r'C:\Users\nasty\PycharmProjects\OxaProject\PJME_hourly.csv')
 d['Datetime'] = pd.to_datetime(d['Datetime'])
@@ -247,26 +245,47 @@ test_data = scaler.transform(test_data).ravel()
 train_data = list(train_data.ravel())[:]
 test_data = list(test_data.ravel())[:]
 
-lookback = 1  # на сколько шагов назад смотрим при предсказании
+lookback = 30  # на сколько шагов назад смотрим при предсказании
 feature = 1  # входной вектор
 count_of_predict = 1  # сколько предсказываем
 xTrain, yTrain = split_sequence(train_data, lookback, count_of_predict)
 xTest, yTest = split_sequence(test_data, lookback, count_of_predict)
 xTrain = xTrain.reshape((xTrain.shape[0], xTrain.shape[1], feature))
+xTest = xTest.reshape((xTest.shape[0], xTest.shape[1], feature))
+# Модель 2
 model = Sequential()
 model.add(
-    LSTM(4, activation='linear', return_sequences=True, input_shape=(lookback, feature), activity_regularizer=l2(0.1)))
-model.add(LSTM(10))
+    LSTM(50, input_shape=(lookback, feature), activation='linear'))
+# model.add(Dropout(0.1))
+# model.add(LSTM(50))
+# model.add(Dropout(0.1))
 model.add(Dense(count_of_predict, activation='linear'))
-model.compile(optimizer='adam', loss='mse')
-history = model.fit(xTrain, yTrain, batch_size=100, epochs=10)
-xTest = xTest[0]
-xTest = xTest.reshape(1, lookback, feature)
+model.compile(optimizer='adam', loss='mse', )
+history = model.fit(xTrain, yTrain, batch_size=100, epochs=10, validation_data=(xTest, yTest))
 yhat = model.predict(xTest, verbose=0)
-xTest=scaler.inverse_transform(xTest)
+yTest = scaler.inverse_transform(yTest)
 yhat = scaler.inverse_transform(yhat)
-print(xTest)
-print(yhat)
-# Преобразовываем данные в исходный формат для проверки RMSE
 
+# Все предсказания и настоящие значение
+for i in range(count_of_predict):
+    plt.plot(yhat[0:300, i], label='predict' + str(i + 1))
+plt.plot(yTest[0:300, 0], label='true')
+plt.legend()
+plt.show()
 
+# Проверить сдвиги во времени
+plt.plot(yhat[0:20, 0], label='predict' + str(1))
+plt.plot(yhat[0:20, 1], label='predict' + str(2))
+plt.legend()
+plt.show()
+
+# Вывод по очереди всех предсказанных значений и их настоящих
+for i in range(count_of_predict):
+    plt.plot(yhat[0:300, i], label='predict' + str(i + 1))
+    plt.plot(yTest[0:300, i], label='true')
+    plt.legend()
+    plt.show()
+
+# Проверка RMSE
+rmse = sqrt(mean_squared_error(yTest, yhat))
+print('Test RMSE: %.3f' % rmse)
