@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt  # Отрисовка графиков
 import numpy as np  # Numpy
 
 from keras.models import Sequential, Input  # Два варианты моделей
-from keras.layers import Dense, LSTM, RepeatVector, TimeDistributed,Dropout  # Стандартные слои
+from keras.layers import Dense, LSTM, RepeatVector, TimeDistributed, Dropout  # Стандартные слои
 from sklearn.preprocessing import StandardScaler, MinMaxScaler  # Нормировщики
 from sklearn.metrics import mean_squared_error
 from math import sqrt
@@ -160,7 +160,7 @@ scaler = StandardScaler()
 data = data.values
 print(data.shape)
 
-cutoff_point = int(len(data[:, 0]) * 0.8)
+cutoff_point = int(len(data[:, 0]) * 0.6)
 train_data = data[:cutoff_point, ]
 test_data = data[cutoff_point + 1:, ]
 train_data = scaler.fit_transform(train_data)
@@ -183,8 +183,8 @@ def split_sequence(sequence, n_steps_in, n_steps_out):
     return np.array(X), np.array(y)
 
 
-lookback = 3  # если =1, то предсказываем по предыдущему значению
-count_of_predict = 2  # количество предсказываемых значений
+lookback = 1  # если =1, то предсказываем по предыдущему значению
+count_of_predict = 1  # количество предсказываемых значений
 xTrain, yTrain = split_sequence(train_data, lookback, count_of_predict)
 xTest, yTest = split_sequence(test_data, lookback, count_of_predict)
 
@@ -194,21 +194,24 @@ features = 5  # Количество выходных слоёв
 
 
 model = Sequential()
-model.add(LSTM(700, input_shape=(lookback, features), activation='sigmoid'))
+model.add(LSTM(500, input_shape=(lookback, features), activation='sigmoid'))
 model.add(RepeatVector(count_of_predict))
-model.add(LSTM(700, return_sequences=True, activation='sigmoid'))
+model.add(LSTM(500, return_sequences=True, activation='sigmoid'))
 model.add(TimeDistributed(Dense(features)))
 model.compile(loss='mse', optimizer='adam')
-history = model.fit(xTrain, yTrain, epochs=200, validation_data=(xTest, yTest))
+history = model.fit(xTrain, yTrain, epochs=100, validation_data=(xTest, yTest))
 
 plt.plot(history.history['loss'], label='Ошибка на обучающем наборе')
 plt.plot(history.history['val_loss'], label='Ошибка на проверочном наборе')
 plt.ylabel('Средняя ошибка')
 plt.legend()
 plt.show()
+
 yhat = model.predict(xTest)
 
 plt.plot(yhat[:, :, 1], label='predict')
 plt.plot(yTest[:, :, 1], label='true')
 plt.legend()
 plt.show()
+print(yTest[:, :, 1])
+print(yhat[:, :, 1])
